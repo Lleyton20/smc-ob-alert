@@ -1,0 +1,127 @@
+//@version=5
+indicator("Magama SMC OB Alert v0.1", overlay=true, max_labels_count=500, max_lines_count=500, max_boxes_count=500)
+
+// ---------- Inputs ----------
+pivotLen   = input.int(3, "Swing Pivot Length", minval=2)
+lookbackOB = input.int(15, "Lookback bars to find OB candle", minval=5)
+drawMid    = input.bool(true, "Draw 50% line of OB")
+alertOnce  = input.bool(true, "Alert only on first mitigation")
+
+// ---------- Swing High/Low ----------
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow(low,  pivotLen, pivotLen)
+
+var float lastSwingHigh = na
+var float lastSwingLow  = na
+if not na(ph)
+    lastSwingHigh := ph
+if not na(pl)
+    lastSwingLow  := pl
+
+// ---------- BOS detection ----------
+bosUp   = not na(lastSwingHigh) and ta.crossover(close, lastSwingHigh)
+bosDown = not na(lastSwingLow)  and ta.crossunder(close, lastSwingLow)
+
+// ---------- Helpers to find OB candle ----------
+f_findLastBearIndex(_lb) =>
+    var int idx = na
+    idx := na
+    for i = 1 to _lb
+        if close[i] < open[i]
+            idx := i
+            break
+    idx
+
+f_findLastBullIndex(_lb) =>
+    var int idx = na
+    idx := na
+    for i = 1 to _lb
+        if close[i] > open[i]
+            idx := i
+            break
+    idx
+
+// ---------- Persistent OB boxes ----------
+var box bullOB = na
+var box bearOB = na
+var bool bullMitigated = false
+var bool bearMitigated = false
+
+// When BOS up -> bullish OB = last bearish candle before BOS
+if bosUp
+    lb = f_findLastBearIndex(lookbackOB)
+    if not na(lb)
+        obTop = open[lb]
+        obBot = low[lb]
+        if not na(bullOB)
+            box.delete(bullOB)
+        bullOB := box.new(left=bar_index - lb, top=obTop, right=bar_index, bottom=obBot,
+            xloc=xloc.bar_index, bgcolor=color.new(color.green, 85), border_color=color.new(color.green, 0))
+        bullMitigated := false
+
+// When BOS down -> bearish OB = last bullish candle before BOS
+if bosDown
+    lb = f_findLastBullIndex(lookbackOB)
+    if not na(lb)
+        obTop = high[lb]
+        obBot = open[lb]
+        if not na(bearOB)
+            box.delete(bearOB)
+        bearOB := box.new(left=bar_index - lb, top=obTop, right=bar_index, bottom=obBot,
+            xloc=xloc.bar_index, bgcolor=color.new(color.red, 85), border_color=color.new(color.red, 0))
+        bearMitigated := false
+
+// Keep boxes extended to the right by updating their right edge each bar
+if not na(bullOB)
+    box.set_right(bullOB, bar_index)
+if not na(bearOB)
+    box.set_right(bearOB, bar_index)
+
+// ---------- Midline (50%) ----------
+f_mid(_b) =>
+    y1 = box.get_top(_b)
+    y2 = box.get_bottom(_b)
+    (y1 + y2) / 2.0
+
+var line bullMid = na
+var line bearMid = na
+
+if drawMid
+    if not na(bullOB)
+        m = f_mid(bullOB)
+        if na(bullMid)
+            bullMid := line.new(bar_index-1, m, bar_index, m, extend=extend.right, color=color.new(color.green, 0))
+        else
+            line.set_y1(bullMid, m), line.set_y2(bullMid, m)
+    if not na(bearOB)
+        m = f_mid(bearOB)
+        if na(bearMid)
+            bearMid := line.new(bar_index-1, m, bar_index, m, extend=extend.right, color=color.new(color.red, 0))
+        else
+            line.set_y1(bearMid, m), line.set_y2(bearMid, m)
+
+// ---------- Touch/Mitigation detection ----------
+f_top(_b) => math.max(box.get_top(_b), box.get_bottom(_b))
+f_bot(_b) => math.min(box.get_top(_b), box.get_bottom(_b))
+
+bullTouched = not na(bullOB) and low <= f_top(bullOB) and high >= f_bot(bullOB)
+bearTouched = not na(bearOB) and low <= f_top(bearOB) and high >= f_bot(bearOB)
+
+bullFire = bullTouched and (not alertOnce or (alertOnce and not bullMitigated))
+bearFire = bearTouched and (not alertOnce or (alertOnce and not bearMitigated))
+
+if bullTouched and not bullMitigated
+    bullMitigated := true
+    label.new(bar_index, close, "Bullish OB mitigated", style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.white)
+if bearTouched and not bearMitigated
+    bearMitigated := true
+    label.new(bar_index, close, "Bearish OB mitigated", style=label.style_label_down, color=color.new(color.red, 0), textcolor=color.white)
+
+// ---------- Alerts ----------
+alertcondition(bullFire, "Bullish OB Touch", "Bullish OB touched on {{ticker}} ({{interval}})")
+alertcondition(bearFire, "Bearish OB Touch", "Bearish OB touched on {{ticker}} ({{interval}})")
+
+if bullFire
+    alert("Bullish OB touched — setup on " + syminfo.ticker + " (" + timeframe.period + ")", alert.freq_once_per_bar_close)
+if bearFire
+    alert("Bearish OB touched — setup on " + syminfo.ticker + " (" + timeframe.period + ")", alert.freq_once_per_bar_close)
