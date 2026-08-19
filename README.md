@@ -1,292 +1,69 @@
 # Magama SMC Order Block Alert
 
-## Smart Money Concepts Market Structure & Order Block Detection System
+A TradingView indicator, written in Pine Script v5, that detects market structure shifts, marks order blocks, and alerts when price returns to one.
 
-Magama SMC Order Block Alert is an advanced TradingView indicator built with Pine Script v5 that automatically detects institutional market structure shifts, identifies high-probability order blocks, and generates real-time alerts when price revisits key supply and demand zones.
+The idea is simple: instead of watching charts all day waiting for price to revisit a zone, let the script watch and notify you.
 
-The system eliminates hours of manual chart analysis by continuously monitoring price action, detecting Break of Structure (BOS) and Change of Character (CHoCH) events, and notifying traders when potential trading opportunities emerge.
-
----
-
-## Why This Project?
-
-Institutional traders leave footprints in the market through liquidity grabs, structure breaks, and order block formations.
-
-Most retail traders struggle to:
-
-* Identify valid order blocks consistently
-* Detect trend reversals early
-* Monitor charts all day
-* React quickly when price reaches key zones
-
-This system automates the entire process.
-
-Instead of manually searching for setups, traders receive alerts when price interacts with significant institutional zones.
+**Repo contents:** `magama_smc_ob_alert.pine` — a single Pine Script indicator, ~N lines. That's the whole project.
 
 ---
 
-# System Workflow
+## What it does
 
-```text
-                PRICE DATA
-                     │
-                     ▼
-        ┌─────────────────────────┐
-        │ Market Structure Engine │
-        └─────────────────────────┘
-                     │
-          ┌──────────┴──────────┐
-          ▼                     ▼
+**Market structure.** Tracks swing highs and lows to classify the current structure as higher-high/higher-low, lower-high/lower-low, or neither. From that it flags two events:
 
-   Break Of Structure      Change Character
-         (BOS)                 (CHoCH)
+- **BOS (Break of Structure)** — price breaks the prior swing point in the direction of trend. Continuation signal.
+- **CHoCH (Change of Character)** — price breaks the prior swing point against the trend. Possible reversal.
 
-          ▼                     ▼
-      Trend Continuation    Trend Reversal
-              \             /
-               \           /
-                ▼         ▼
+**Order blocks.** On a structure break, the script marks the last opposing candle before the impulse move as an order block — a bullish (demand) or bearish (supply) zone — and draws it on the chart.
 
-          Order Block Detection
+**Alerts.** Once a zone is drawn, the script watches for price to return to it. When price re-enters, a TradingView alert fires. TradingView handles delivery from there (desktop, mobile, email, browser).
 
-                    ▼
-
-        Bullish / Bearish Zones
-
-                    ▼
-
-          Price Monitoring Engine
-
-                    ▼
-
-          Alert Notification System
-
-                    ▼
-
-          TradingView Notification
+```
+swing detection → BOS / CHoCH → mark order block → watch for retest → alert
 ```
 
 ---
 
-# High-Level Architecture
+## Install
 
-```text
-┌─────────────────────────────────────┐
-│         TradingView Chart           │
-└─────────────────────────────────────┘
-                  │
-                  ▼
-
-┌─────────────────────────────────────┐
-│     Pine Script Analysis Layer      │
-└─────────────────────────────────────┘
-                  │
-
-      ┌───────────┼───────────┐
-
-      ▼                       ▼
-
- Market Structure       Trend Detection
-      Engine                 Engine
-
-      ▼                       ▼
-
- Break of Structure      Change Character
-      (BOS)                  (CHoCH)
-
-      └───────────┬───────────┘
-                  ▼
-
-        Order Block Generator
-
-                  ▼
-
-       Bullish / Bearish Zones
-
-                  ▼
-
-          Alert Manager
-
-                  ▼
-
-      TradingView Notifications
-```
+1. Open TradingView → Pine Editor
+2. Paste the contents of `magama_smc_ob_alert.pine`
+3. Save, then "Add to chart"
+4. Right-click chart → Add alert → select this indicator as the condition
 
 ---
 
-# Core Features
+## Inputs
 
-## Market Structure Analysis
+<!-- TODO: fill this from the actual `input.*` calls in the script.
+     One row per input: what it controls and what the default is.
+     If a reviewer can't tell how to configure it, the README isn't done. -->
 
-The indicator continuously evaluates market structure and identifies:
-
-* Higher highs
-* Higher lows
-* Lower highs
-* Lower lows
-* Break of Structure (BOS)
-* Change of Character (CHoCH)
-
-This allows traders to understand whether the market is:
-
-* Trending upward
-* Trending downward
-* Reversing
-* Consolidating
+| Input | Default | What it does |
+|---|---|---|
+| | | |
 
 ---
 
-## Order Block Detection
+## Known limitations
 
-Automatically identifies:
+Worth being upfront about these — they're the honest state of the project, not a roadmap.
 
-### Bullish Order Blocks
-
-Institutional demand zones where buying pressure may enter the market.
-
-### Bearish Order Blocks
-
-Institutional supply zones where selling pressure may enter the market.
-
-The most relevant order blocks are displayed directly on the chart.
+- **No backtest.** I haven't measured hit rate or expectancy. The indicator identifies zones; it makes no claim about whether trading them is profitable.
+- **Swing detection is lookback-based**, so structure points confirm only after the lookback window closes. Signals are not instantaneous.
+- **Repainting:** <!-- TODO: state plainly whether zones can move or disappear after the fact. If you haven't checked, check — this is the first thing anyone experienced will ask. -->
+- **Single timeframe.** No multi-timeframe confluence.
+- **Order block selection is heuristic** — last opposing candle before the impulse. Other definitions exist; this one is a choice, not a standard.
 
 ---
 
-## Trend Reversal Detection
+## Ideas for later
 
-One of the primary goals of the indicator is identifying possible trend changes before they become obvious.
-
-The system achieves this through:
-
-* Structure break confirmation
-* Character change detection
-* Order block validation
-* Price interaction monitoring
+Fair value gap detection · liquidity sweep detection · multi-timeframe confluence · a backtest harness to actually measure whether the zones mean anything.
 
 ---
 
-## Smart Alert System
+## Disclaimer
 
-Once an order block has been identified:
-
-```text
-Order Block Created
-          │
-          ▼
-
-Price Moves Away
-
-          │
-          ▼
-
-Price Returns To Zone
-
-          │
-          ▼
-
-Alert Triggered
-
-          │
-          ▼
-
-Trader Receives Notification
-```
-
-Alerts can be configured through TradingView and delivered to:
-
-* Desktop
-* Mobile
-* Email
-* Browser notifications
-
----
-
-# Example Trading Scenario
-
-```text
-UPTREND
-
-Higher High
-      ▲
-      │
-
-Higher Low
-      ▲
-      │
-
-Higher High
-      ▲
-      │
-
-Break Of Structure
-
-      ▼
-
-Order Block Created
-
-      ▼
-
-Price Retraces
-
-      ▼
-
-Price Enters Order Block
-
-      ▼
-
-ALERT SENT
-
-      ▼
-
-Potential Trade Opportunity
-```
-
----
-
-# Technical Stack
-
-### Language
-
-* Pine Script v5
-
-### Platform
-
-* TradingView
-
-### Concepts Implemented
-
-* Smart Money Concepts (SMC)
-* Break of Structure (BOS)
-* Change of Character (CHoCH)
-* Order Blocks
-* Market Structure Analysis
-* Trend Detection
-* Alert Automation
-
----
-
-# Key Benefits
-
-* Eliminates manual chart scanning
-* Detects institutional activity automatically
-* Provides objective market structure analysis
-* Generates real-time alerts
-* Reduces missed trading opportunities
-* Supports systematic decision making
-
----
-
-# Future Enhancements
-
-* Fair Value Gap (FVG) Detection
-* Liquidity Sweep Detection
-* Multi-Timeframe Confluence
-* Automated Risk-to-Reward Calculations
-* Backtesting Dashboard
-* Trade Performance Analytics
-
----
-
-# Disclaimer
-
-This project is intended for educational and analytical purposes only. Trading financial markets involves significant risk. Users should conduct independent research and implement proper risk management before making trading decisions.
+Educational and analytical use only. This is not trading advice and carries no performance claim. Trading involves substantial risk of loss.                    ▼
